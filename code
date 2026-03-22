@@ -1,0 +1,138 @@
+import os
+import sys
+import time
+import logging
+import traci
+import sumolib
+import requests
+from datetime import datetime
+import csv
+
+logging.basicConfig(level=logging.INFO)
+
+class SUMODataSender:
+    def __init__(self, config_file, host, port):
+        self.config_file = config_file
+        self.host = host
+        self.port = port
+        self.output_csv = "traffic_data.csv"
+
+    def setup_sumo(self):
+        if 'SUMO_HOME' not in os.environ:
+            raise EnvironmentError("SUMO_HOME not set")
+
+        tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
+        sys.path.append(tools)
+
+    def collect_data(self):
+        vehicle_ids = traci.vehicle.getIDList()
+        speeds = [traci.vehicle.getSpeed(v) for v in vehicle_ids]
+
+        return {
+            "total_vehicles": len(vehicle_ids),
+            "avg_speed": sum(speeds)/len(speeds) if speeds else 0
+        }
+
+    def send_data(self, data):
+        url = f"http://{self.host}:{self.port}/update"
+        try:
+            requests.post(url, json=data)
+        except Exception as e:
+            logging.error(e)
+
+    def run(self):
+        sumoBinary = sumolib.checkBinary('sumo-gui')
+        traci.start([sumoBinary, "-c", self.config_file])
+
+        while traci.simulation.getMinExpectedNumber() > 0:
+            traci.simulationStep()
+
+            data = self.collect_data()
+            data["time"] = datetime.now().strftime("%H:%M:%S")
+
+            print(data)
+            self.send_data(data)
+
+            time.sleep(0.1)
+
+        traci.close()
+
+
+if __name__ == "__main__":
+    sender = SUMODataSender("osm.sumocfg", "127.0.0.1", 8080)
+    sender.run()
+
+src/distributed_system.py
+
+"""
+Handles distributed traffic simulation across multiple nodes
+"""
+
+def start_nodes():
+    print("Starting distributed traffic nodes...")
+
+def collect_results():
+    print("Collecting data from nodes...")
+
+if __name__ == "__main__":
+    start_nodes()
+
+src/fix_sumo_paths.py
+
+import os
+
+def check_sumo():
+    if 'SUMO_HOME' not in os.environ:
+        print("❌ SUMO not configured")
+    else:
+        print("✅ SUMO configured")
+
+if __name__ == "__main__":
+    check_sumo()
+
+src/traffic_analysis.py
+
+import csv
+import matplotlib.pyplot as plt
+
+def analyze(file):
+    times = []
+    vehicles = []
+
+    with open(file) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            times.append(row['Simulation Time'])
+            vehicles.append(int(row['Total Vehicles']))
+
+    plt.plot(times, vehicles)
+    plt.title("Traffic Analysis")
+    plt.show()
+
+if __name__ == "__main__":
+    analyze("traffic_data.csv")
+
+  requirements.txt
+  
+  traci
+sumolib
+requests
+matplotlib
+
+traffic-optimization/
+│
+├── README.md
+├── requirements.txt
+│
+├── src/
+│   ├── data_sender.py
+│   ├── distributed_system.py
+│   ├── fix_sumo_paths.py
+│   └── traffic_analysis.py
+
+  git init
+git add .
+git commit -m "Added traffic optimization system code"
+git branch -M main
+git remote add origin https://github.com/RShreeram/traffic-optimization.git
+git push -u origin main
